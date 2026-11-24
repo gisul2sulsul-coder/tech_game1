@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>모두의 기술</title>
+<style>
+/* 웹 폰트를 외부에서 실시간으로 불러오도록 수정하여 코드가 잘리는 문제를 해결했습니다. */
+@font-face {
+  font-family: 'Galmuri14';
+  src: url('https://cdn.jsdelivr.net/npm/galmuri@latest/dist/Galmuri14.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Galmuri11';
+  src: url('https://cdn.jsdelivr.net/npm/galmuri@latest/dist/Galmuri11.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Galmuri9';
+  src: url('https://cdn.jsdelivr.net/npm/galmuri@latest/dist/Galmuri9.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* 레이아웃: 왼쪽 보드 + 오른쪽 조작 패널 2단(좁으면 1단). 모든 면은 4px 잉크 테두리와 하드 섀도. */
+:root{
+  --ink:#1a1c2c; --night:#29366f; --night2:#2e3c7a; --paper:#f4f4f4; --paper2:#dfe6ec;
+  --mute:#566c86; --steel:#94b0c2; --p1:#3b5dc9; --p2:#b13e53; --p3:#ffcd75; --gold:#ffcd75; --amber:#ef7d57;
+  --good:#38b764; --lime:#a7f070; --sky:#73eff6;
+  --f-body:"Galmuri14","NeoDunggeunmo","DungGeunMo",monospace;
+  --f-small:"Galmuri11","NeoDunggeunmo","DungGeunMo",monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--night)}
+body{
+  background-color:var(--night);
+  background-image:linear-gradient(45deg,var(--night2) 25%,transparent 25%,transparent 75%,var(--night2) 75%),
+                   linear-gradient(45deg,var(--night2) 25%,transparent 25%,transparent 75%,var(--night2) 75%);
+  background-size:16px 16px; background-position:0 0,8px 8px;
+  color:var(--ink); font:15px/1.6 var(--f-body);
+  -webkit-font-smoothing:none; font-smooth:never;
+  padding-block:20px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+
+/* 캔버스 안티앨리어싱 제거 (고해상도에서도 픽셀아트 선명하게 유지) */
+canvas {
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.wrap{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+b,strong{font-weight:400;box-shadow:inset 0 -6px 0 var(--gold)}
+button{font:inherit;color:inherit}
+
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 16px}
+h1{margin:0;font:400 30px/1.2 var(--f-body);color:var(--gold);text-shadow:3px 3px 0 var(--ink)}
+.sub{margin:0;color:var(--sky);font:12px/1.5 var(--f-small);letter-spacing:1px}
+.hud{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+@media (max-width:1099px){#bigBtn{display:none}}
+.pill{font:12px/1 var(--f-small);padding:8px 10px;background:var(--ink);color:var(--lime);border:2px solid var(--ink);box-shadow:inset 0 0 0 2px var(--mute)}
+button.pill{cursor:pointer;color:var(--paper)}
+button.pill[aria-pressed="true"]{color:var(--gold)}
+
+.stage{display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:16px;align-items:start}
+.boardBox{border:4px solid var(--ink);box-shadow:6px 6px 0 var(--ink);background:var(--ink);line-height:0}
+#board{width:100%;height:auto;display:block}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+/* 스코어보드 3개 배치되도록 gap 조정 */
+.scores{display:flex;gap:8px} 
+.pc{flex:1;min-width:0;display:flex;gap:4px;align-items:center;padding:6px;background:var(--paper);border:4px solid var(--ink);box-shadow:4px 4px 0 var(--ink)}
+.pc canvas{width:32px;height:32px;flex:none}
+.pc.on{background:var(--gold)}
+.pcT{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.pcN{font:12px/1.4 var(--f-small)}
+#pc-player .pcN{color:var(--p1)} #pc-ai1 .pcN{color:var(--p2)} #pc-ai2 .pcN{color:var(--p3)}
+.pc.on .pcN::after{content:" ◀ 턴"}
+.pcB{font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pcB span{font-size:24px;line-height:1}
+.pcS{font:11px/1.4 var(--f-small);color:var(--mute)}
+.pc.on .pcS{color:var(--ink)}
+
+.dice{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--night);border:4px solid var(--ink);color:var(--paper);min-height:68px}
+.die{width:44px;height:44px;flex:none;background:var(--paper);border:4px solid var(--ink);box-shadow:inset -4px -4px 0 var(--steel);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);gap:2px;padding:4px 8px 8px 4px}
+.die i{background:transparent}
+.die i.d{background:var(--ink)}
+.die.one i.d{background:var(--p2)}
+
+.panel{background:var(--paper);border:4px solid var(--ink);box-shadow:4px 4px 0 var(--ink);padding:12px;min-height:250px;display:flex;flex-direction:column;gap:8px}
+.tag{align-self:flex-start;font:12px/1 var(--f-small);padding:6px 8px;color:var(--paper);background:var(--mute);letter-spacing:1px}
+.panel h3{margin:0;font:400 15px/1.6 var(--f-body);word-break:keep-all}
+.panel p{margin:0;word-break:keep-all}
+.body{display:flex;flex-direction:column;gap:6px}
+.note{font:12px/1.5 var(--f-small);background:var(--paper2);padding:6px 8px;border-left:4px solid var(--p1)}
+.good{color:#1f7a49} .bad{color:var(--p2)}
+.exp{font:12px/1.6 var(--f-small);color:var(--mute)}
+.btns{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.btn{display:block;width:100%;text-align:left;padding:9px 12px;background:#fff;border:3px solid var(--ink);box-shadow:inset -3px -3px 0 var(--steel);cursor:pointer;word-break:keep-all}
+.btn:hover{background:var(--paper2)}
+.btn:active{box-shadow:inset 3px 3px 0 var(--steel)}
+.btn:focus-visible,.pill:focus-visible,summary:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+.btn.primary{text-align:center;background:var(--gold);box-shadow:inset -3px -3px 0 var(--amber)}
+.btn.primary:active{box-shadow:inset 3px 3px 0 var(--amber)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.done{cursor:default;box-shadow:none}
+.btn.done:hover{background:#fff}
+.btn.correct,.btn.correct:hover{background:var(--good);color:#fff}
+.btn.wrong,.btn.wrong:hover{background:var(--p2);color:#fff}
+.btn small{display:block;font:12px/1.5 var(--f-small);color:var(--mute)}
+.chip{display:inline-block;font:12px/1 var(--f-small);padding:3px 5px;border:2px solid var(--ink);vertical-align:middle}
+.chip.fit{background:var(--lime)} .chip.unfit{background:var(--steel)}
+.aiq{list-style:none;margin:0;padding:0;font:12px/1.7 var(--f-small)}
+.aiq li{padding:1px 6px}
+.aiq .ans{background:var(--lime)} .aiq .miss{background:var(--p2);color:#fff}
+.big{font-size:30px;line-height:1.3;text-align:center;text-shadow:2px 2px 0 var(--gold)}
+.tbl{width:100%;border-collapse:collapse;font:12px/1.6 var(--f-small);font-variant-numeric:tabular-nums}
+.tbl th,.tbl td{border:2px solid var(--ink);padding:3px 6px;text-align:right;font-weight:400}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl thead th{background:var(--ink);color:var(--paper)}
+.tbl tr.sum td{background:var(--gold)}
+
+.log{list-style:none;margin:0;padding:8px 10px;background:var(--ink);color:var(--mute);font:12px/1.6 var(--f-small);border:4px solid var(--ink);box-shadow:inset 0 0 0 2px var(--mute);min-height:92px}
+.log li::before{content:"> "}
+.log li:first-child{color:var(--lime)}
+
+.guide,.rules{background:var(--paper);border:4px solid var(--ink);box-shadow:4px 4px 0 var(--ink);padding:12px}
+.guide h2{margin:0 0 8px;font:400 15px/1.4 var(--f-body)}
+.guideGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.gc{display:flex;gap:8px;align-items:center;min-width:0;padding:6px;background:#fff;border:2px solid var(--ink)}
+.gc canvas{width:56px;height:56px;flex:none;background:var(--sky)}
+.gc div{min-width:0;font:12px/1.6 var(--f-small)}
+.gc strong{font:15px/1.3 var(--f-body);box-shadow:none;display:block}
+.rules summary{cursor:pointer}
+.rules ol{margin:8px 0 0;padding-left:22px;font:12px/1.8 var(--f-small)}
+footer{color:var(--steel);font:12px/1.5 var(--f-small);text-align:center}
+
+@media (max-width:780px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .boardBox{max-width:440px;width:100%;margin:0 auto}
+  .scores{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="wrap">
+  <header class="top">
+    <div>
+      <h1>모두의 기술</h1>
+      <p class="sub">친환경 에너지 대전 · PIXEL EDITION (3인 플레이 모드)</p>
+    </div>
+    <div class="hud">
+      <span class="pill" id="roundInfo">ROUND 1/20</span>
+      <button class="pill" id="bigBtn" type="button" aria-pressed="true">▣ 큰 화면 자동</button>
+      <button class="pill" id="sndBtn" type="button" aria-pressed="false">♪ 소리 꺼짐</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="boardBox"><canvas id="board" width="864" height="864" role="img" aria-label="모두의 기술 게임 보드"></canvas></div>
+    <div class="side">
+      <div class="scores">
+        <!-- 플레이어 3명 스코어 보드 -->
+        <div class="pc" id="pc-player"><canvas id="av-player" width="40" height="40"></canvas>
+          <div class="pcT"><span class="pcN">당신</span><span class="pcB"><span id="bud-player">0</span>억</span><span class="pcS" id="st-player">발전소 0</span></div></div>
+        <div class="pc" id="pc-ai1"><canvas id="av-ai1" width="40" height="40"></canvas>
+          <div class="pcT"><span class="pcN">COM 1</span><span class="pcB"><span id="bud-ai1">0</span>억</span><span class="pcS" id="st-ai1">발전소 0</span></div></div>
+        <div class="pc" id="pc-ai2"><canvas id="av-ai2" width="40" height="40"></canvas>
+          <div class="pcT"><span class="pcN">COM 2</span><span class="pcB"><span id="bud-ai2">0</span>억</span><span class="pcS" id="st-ai2">발전소 0</span></div></div>
+      </div>
+      <div class="dice" id="dice"></div>
+      <section class="panel" id="panel" aria-live="polite"></section>
+      <ol class="log" id="log" aria-label="진행 기록"></ol>
+    </div>
+  </main>
+
+  <section class="guide">
+    <h2>발전소 입지 가이드</h2>
+    <div class="guideGrid" id="guide"></div>
+  </section>
+
+  <details class="rules">
+    <summary>게임 규칙 보기</summary>
+    <ol id="rules"></ol>
+  </details>
+
+  <footer>원작 기술이술술 · 글꼴 Galmuri (SIL OFL 1.1)</footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* =====================================================================
+   1. 설정 — 숫자와 문제는 여기만 고치면 됩니다
+   ===================================================================== */
+var CFG = {
+  START_BUDGET: 1500,   // 시작 예산(억)
+  GO_BONUS: 200,        // 출발점 통과 지원금
+  MAX_ROUNDS: 20,       // 이 라운드가 끝나면 총자산으로 승부
+  TOLL_RATE: 4,         // 사용료 = 발전량 × TOLL_RATE × 레벨
+  UNFIT: 0.4,           // 입지가 안 맞을 때 발전량 배율
+  UPGRADE_RATE: 0.6,    // 증설 비용 = 건설비 × UPGRADE_RATE
+  SELL_RATE: 0.5,       // 매각 시 돌려받는 투자금 비율 (50%)
+  SELL_THRESHOLD: 300,  // 이 금액 이하가 되면 자산 매각 가능 (300억)
+  MAX_LEVEL: 3,
+  WELFARE: 100,         // 사회복지 칸 지원금
+  AI_CORRECT: 0.65,     // COM 퀴즈 정답 확률
+  AI_RESERVE: 150       // COM이 남겨 두는 최소 예산
+};
+
+var REGIONS = ["해안","산간","평야","사막","강","농촌"];
+var SOURCES = [
+ {id:"solar",name:"태양광",cost:150,power:35,good:["평야","사막"]},
+ {id:"wind", name:"풍력", cost:170,power:45,good:["해안","산간"]},
+ {id:"hydro",name:"수력", cost:220,power:65,good:["강","산간"]},
+ {id:"geo",  name:"지열", cost:200,power:40,good:["산간","사막"]},
+ {id:"bio",  name:"바이오",cost:120,power:30,good:["농촌","평야"]}
+];
+
+var QUIZZES = [
+  {
+    q: "에너지의 의미로 가장 알맞은 것은 무엇인가요?",
+    choices: ["일을 할 수 있는 능력", "오염 물질을 줄이는 기술", "화석 연료를 대체하는 물질", "전기를 절약하는 방법"],
+    answer: 0,
+    exp: "에너지는 일을 할 수 있는 능력을 의미하며, 열, 전기, 화학 등 다양한 형태로 변환되어 사용됩니다."
+  },
+  {
+    q: "다음 중 화석 연료에 속하지 않는 것은?",
+    choices: ["석탄", "석유", "천연가스", "우라늄"],
+    answer: 3,
+    exp: "대표적인 화석 연료는 석탄, 석유, 천연가스이며, 우라늄이나 수소 등은 화석 연료가 아닙니다."
+  },
+  {
+    q: "화석 연료를 계속 사용할 때 발생하는 문제점이 아닌 것은?",
+    choices: ["지구 온난화 가속화", "이상 기후 현상 발생", "초기 건설 비용 과다", "호흡기 질환 등 건강 위협"],
+    answer: 2,
+    exp: "초기 건설 비용이 많이 드는 것은 화석 연료의 문제점이 아니라 재생 에너지의 단점입니다."
+  },
+  {
+    q: "친환경 에너지의 특성으로 알맞지 않은 것은?",
+    choices: ["환경 오염이 거의 없다.", "에너지원이 고갈될 염려가 없다.", "지속 가능한 발전을 하게 한다.", "어디서나 지형 조건의 제한 없이 설치할 수 있다."],
+    answer: 3,
+    exp: "친환경(재생) 에너지는 자연에 존재하는 에너지를 활용하므로 대부분 지형 조건에 제한을 가진다는 단점이 있습니다."
+  },
+  {
+    q: "재생 에너지의 장점과 단점이 바르게 짝지어진 것은?",
+    choices: ["장점: 초기 비용 저렴 / 단점: 자원 고갈", "장점: 무한에 가까운 에너지 / 단점: 지형 조건 제한", "장점: 날씨 영향 없음 / 단점: 오염 물질 배출", "장점: 좁은 면적 설치 / 단점: 수입 의존"],
+    answer: 1,
+    exp: "재생 에너지는 에너지가 무한에 가깝게 공급되지만, 초기 건설 비용이 많이 들고 지형 조건에 제한이 있다는 단점이 있습니다."
+  },
+  {
+    q: "반도체로 이루어진 태양 전지를 이용하여 빛에너지를 전기에너지로 직접 변환하는 에너지는?",
+    choices: ["태양열 에너지", "태양광 에너지", "지열 에너지", "바이오 에너지"],
+    answer: 1,
+    exp: "태양광 에너지는 반도체로 이루어진 태양 전지를 이용하여 태양의 빛을 전기 에너지로 변환합니다."
+  },
+  {
+    q: "태양열 에너지에 대한 설명으로 옳은 것은?",
+    choices: ["태양 전지를 이용해 직접 전기를 만든다.", "바닷물의 온도 차이를 이용한다.", "집열 시설에 열을 모아 물을 가열하여 사용한다.", "밤이나 비 오는 날에도 발전량이 일정하다."],
+    answer: 2,
+    exp: "태양열 에너지는 집열 시설에 태양열을 모아 물을 가열하여 난방, 온수 등으로 사용하거나 전기를 생산합니다."
+  },
+  {
+    q: "높은 곳에서 떨어지는 물의 위치 에너지를 운동 에너지로 바꾸어 수차를 돌려 전기를 생산하는 에너지는?",
+    choices: ["조력 에너지", "파력 에너지", "수력 에너지", "조류 에너지"],
+    answer: 2,
+    exp: "수력 에너지는 높은 곳에서 떨어지는 물의 에너지를 이용하여 수차를 회전시켜 전기 에너지를 생산합니다."
+  },
+  {
+    q: "풍력 에너지에 대한 설명으로 옳지 않은 것은?",
+    choices: ["바람의 힘으로 날개를 회전시킨다.", "소음 문제가 발생할 수 있다.", "건설 비용이 아주 적게 든다.", "바람이 많이 부는 곳에 무리 지어 세운다."],
+    answer: 2,
+    exp: "풍력 발전은 규모가 크기 때문에 건설 비용이 많이 들며 주변에 소음 문제가 발생할 수 있습니다."
+  },
+  {
+    q: "밀물과 썰물 때 바닷물의 깊이가 달라지는 현상을 이용하는 해양 에너지는?",
+    choices: ["파력 에너지", "온도차 에너지", "조력 에너지", "조류 에너지"],
+    answer: 2,
+    exp: "바다에서 발생하는 해양 에너지 중, 밀물과 썰물 때의 수심 차이를 이용하는 것을 조력 에너지라고 합니다."
+  },
+  {
+    q: "쓰레기를 재활용하여 에너지를 생산하지만, 처리 과정에서 또 다른 환경 오염이 발생할 수 있는 에너지는?",
+    choices: ["바이오 에너지", "폐기물 에너지", "지열 에너지", "연료 전지"],
+    answer: 1,
+    exp: "폐기물 에너지는 가정이나 공장의 폐기물을 재활용하여 생산하나, 처리 과정에서 환경 오염이 발생할 수 있어 기술 연구가 필요합니다."
+  },
+  {
+    q: "옥수수, 사탕수수, 가축의 분뇨 등 생물 자원(바이오매스)을 이용해 연료를 만드는 에너지는?",
+    choices: ["지열 에너지", "바이오 에너지", "해양 에너지", "수소 에너지"],
+    answer: 1,
+    exp: "바이오 에너지는 생물 자원인 바이오매스를 통해 알코올, 메테인 가스 등의 연료를 만들어 에너지를 생산합니다."
+  },
+  {
+    q: "땅속 깊은 곳에 존재하는 뜨거운 물과 마그마의 열에너지를 이용하는 에너지는?",
+    choices: ["태양열 에너지", "폐기물 에너지", "신에너지", "지열 에너지"],
+    answer: 3,
+    exp: "지열 에너지는 땅속의 뜨거운 열에너지로 물을 끓이거나 터빈을 돌려 전기 에너지를 생산하며 냉난방에도 활용됩니다."
+  },
+  {
+    q: "다음 중 '신에너지'에 해당하는 것만 바르게 짝지은 것은?",
+    choices: ["태양광, 수력", "풍력, 지열", "수소 에너지, 연료 전지", "해양 에너지, 바이오 에너지"],
+    answer: 2,
+    exp: "신에너지는 화석 연료를 변환하거나 수소/산소의 화학 반응을 이용하는 것으로 수소 에너지, 연료 전지, 석탄 액화 및 가스화가 있습니다."
+  },
+  {
+    q: "물, 유기물 등에서 화합물 형태의 '이것'을 분리하여 연료로 쓰며, 최근 친환경 버스의 동력원으로 쓰이는 에너지는?",
+    choices: ["수소 에너지", "폐기물 에너지", "바이오 에너지", "태양광 에너지"],
+    answer: 0,
+    exp: "수소 에너지는 화합물 형태의 수소를 분리해 생산하며 매연을 줄여주는 수소 버스 등에 활용됩니다."
+  },
+  {
+    q: "수소와 산소가 화학 반응을 할 때 발생하는 전기와 물을 이용하는 에너지는?",
+    choices: ["연료 전지", "지열 에너지", "태양열 에너지", "석탄 가스화"],
+    answer: 0,
+    exp: "연료 전지는 수소와 산소가 화학 반응할 때 발생하는 전기와 물을 발전소나 수송 수단의 에너지원으로 활용합니다."
+  },
+  {
+    q: "석탄을 직접 연소시키지 않고 산소와 물을 넣고 가열하여 액체나 기체 상태로 만들어 사용하는 에너지는?",
+    choices: ["바이오 에너지", "석탄 액화 및 가스화", "해양 온도차 에너지", "폐기물 에너지"],
+    answer: 1,
+    exp: "석탄 액화 및 가스화는 석탄을 액체나 기체로 만들어 전기로 변환하며, 오염 물질 배출이 적은 신에너지입니다."
+  },
+  {
+    q: "현재뿐만 아니라 미래 세대를 위해 경제 성장, 사회 안정, 환경 보전이 균형을 이루는 발전을 의미하는 용어는?",
+    choices: ["지속 가능한 발전", "산업 혁명", "환경 파괴", "무한 발전"],
+    answer: 0,
+    exp: "지속 가능한 발전이란 미래 세대를 위해 경제, 사회, 환경이 균형을 이루는 발전을 뜻하며, 친환경 에너지가 이를 돕습니다."
+  },
+  {
+    q: "신에너지의 장단점에 대한 설명으로 옳은 것은?",
+    choices: ["장점: 건설 비용이 매우 적다.", "단점: 환경 오염 물질을 많이 배출한다.", "단점: 에너지를 생산하는 과정에서 비용이 많이 든다.", "장점: 자연환경(날씨)의 영향을 가장 많이 받는다."],
+    answer: 2,
+    exp: "신에너지는 오염 물질을 적게 배출한다는 장점이 있지만, 에너지를 생산하는 과정에서 비용이 많이 든다는 단점이 있습니다."
+  },
+  {
+    q: "재생 에너지의 종류와 구체적인 활용 사례가 바르게 연결된 것은?",
+    choices: ["수력 에너지 - 소규모 댐 건설", "풍력 에너지 - 태양 전지 가로등", "바이오 에너지 - 바다 표면 온도차 이용", "지열 에너지 - 가축의 분뇨 재활용"],
+    answer: 0,
+    exp: "수력 에너지는 큰 댐뿐만 아니라 비용이 적게 들고 환경을 파괴하지 않는 소규모 댐(소수력 발전)으로도 활용됩니다."
+  }
+];
+
+var CHANCE_EVENTS = [
+ {text:"정부의 친환경 보조금을 받았습니다!\n예산 +150억", type:"bonus", amount:150},
+ {text:"기상 악화로 발전소 효율이 떨어졌습니다. 점검비 발생!\n예산 -100억", type:"penalty", amount:100},
+ {text:"에너지 정책 공모전 1위 수상!\n예산 +200억", type:"bonus", amount:200},
+ {text:"탄소 배출 할당량을 초과하여 벌금을 냈습니다!\n예산 -120억", type:"penalty", amount:120},
+ {text:"스마트 그리드 도입으로 전력 손실을 막았습니다!\n예산 +100억", type:"bonus", amount:100},
+ {text:"태풍으로 인해 해안가 송전탑이 파손되었습니다!\n복구비 -150억", type:"penalty", amount:150}
+];
+
+/* =====================================================================
+   2. 픽셀 아트 — 팔레트, 스프라이트, 지형
+   ===================================================================== */
+var INK="#1a1c2c", W="#f4f4f4", SKY="#73eff6", SEA="#41a6f6", BLUE="#3b5dc9", NAVY="#29366f",
+    GREEN="#38b764", LIME="#a7f070", TEAL="#257179", GOLD="#ffcd75", AMBER="#ef7d57",
+    RED="#b13e53", PLUM="#5d275d", STEEL="#94b0c2", SLATE="#566c86";
+
+var REGION_COLOR = {"해안":SEA,"산간":GREEN,"평야":LIME,"사막":GOLD,"강":BLUE,"농촌":AMBER};
+var REGION_TEXT  = {"강":W};
+
+/* COM2 전용 노란색(GOLD) 스프라이트 'ai2' 추가 */
+var SPR = {
+  solar:{pal:{Y:GOLD,B:NAVY,c:SEA,G:SLATE},rows:[
+    "........YY..",".......YYYY.",".......YYYY.","........YY..",
+    ".BBBBBBBB...",".BcBBcBBcB..",".BBBBBBBB...",".BcBBcBBcB..",
+    ".BBBBBBBB...","....GG......","....GG......","...GGGG....."]},
+  wind:{pal:{W:W,R:RED,G:STEEL},rows:[
+    ".....W......",".....W......",".....W......",".....W......",
+    "....WRW.....","...W.G.W....","..W..G..W...",".W...G...W..",
+    ".....G......",".....G......",".....G......","....GGG....."]},
+  hydro:{pal:{G:STEEL,g:SLATE,c:SKY,b:BLUE},rows:[
+    "............","GGGGGGGGGGGG","GgGgGgGgGgGg","GGGGGGGGGGGG",
+    "GGcGGcGGcGGG","GGcGGcGGcGGG","GGcGGcGGcGGG",".GcGGcGGcGG.",
+    ".GcGGcGGcGG.","..cGGcGGcG..","bbcbbcbbcbbb","bbbbbbbbbbbb"]},
+  geo:{pal:{W:W,G:SLATE,y:GOLD,R:RED,O:AMBER},rows:[
+    "....WWW.....","...WWWWW....","....WWWW....",".....WW.....",
+    "....GGGG....","....GGGG....","..GGGGGGGG..","..GyGGyGGG..",
+    "..GGGGGGGG..",".RRRRRRRRRR.","RROORROORRRR","RRRRRRRRRRRR"]},
+  bio:{pal:{L:GREEN,l:LIME,t:TEAL,P:PLUM,p:RED},rows:[
+    ".....LL.....","....LLLL....","...LLlLLL...","...LLLlLL...",
+    "....LLLL....",".....tt.....","..PPPPPPPP..",".PPpPPPPPPP.",
+    ".PPpPPPPPPP.",".PPpPPPPPPP.",".PPPPPPPPPP.","..PPPPPPPP.."]},
+  player:{pal:{Y:GOLD,S:"#f6d7b0",k:INK,B:BLUE},rows:[
+    "..YYYY..",".YYYYYY.",".SSSSSS.",".SkSSkS.",".SSSSSS.","BBBBBBBB","BBBBBBBB",".BB..BB."]},
+  ai:{pal:{R:RED,G:STEEL,w:SKY,k:INK},rows:[
+    "...RR...",".GGGGGG.",".GwGGwG.",".GGGGGG.",".GkkkkG.","RRRRRRRR","RRRRRRRR",".RR..RR."]},
+  ai2:{pal:{R:GOLD,G:STEEL,w:SKY,k:INK},rows:[
+    "...RR...",".GGGGGG.",".GwGGwG.",".GGGGGG.",".GkkkkG.","RRRRRRRR","RRRRRRRR",".RR..RR."]},
+  key:{pal:{Y:GOLD},rows:[
+    "........",".YYY....","Y...Y...","Y...YYYY","Y...Y.Y.",".YYY....","........","........"]},
+  flag:{pal:{k:INK,F:W},rows:[
+    ".kFFFF..",".kFFFFF.",".kFFFF..",".k......",".k......",".k......","kkk.....","........"]},
+  palm:{pal:{L:GREEN,T:AMBER,Y:GOLD},rows:[
+    "..LL.LL.",".LLLLLLL","L..TL..L","...T....","...T....","..YTYY..",".YYYYYY.","........"]},
+  rocket:{pal:{W:W,c:SEA,R:RED,O:AMBER},rows:[
+    "...WW...","..WWWW..","..WccW..","..WWWW..","..WWWW..",".RWWWWR.",".R.OO.R.","...OO..."]},
+  heart:{pal:{R:RED},rows:[
+    ".RR..RR.","RRRRRRRR","RRRRRRRR","RRRRRRRR",".RRRRRR.","..RRRR..","...RR...","........"]}
+};
+
+/* 외곽선(스티커 테두리) 로직이 추가된 스프라이트 그리기 함수 */
+function drawSprite(c, name, x, y, s, outline, outerColor){
+  var spr = SPR[name], rows = spr.rows, i, j, ch;
+  
+  // 1. 바깥쪽 스티커 테두리 (outerColor가 있을 경우)
+  if(outerColor){
+    c.fillStyle = outerColor;
+    for(i=0;i<rows.length;i++) for(j=0;j<rows[i].length;j++)
+      if(rows[i][j] !== ".") {
+        c.fillRect(x+(j-2)*s, y+(i-1)*s, 5*s, 3*s);
+        c.fillRect(x+(j-1)*s, y+(i-2)*s, 3*s, 5*s);
+      }
+  }
+  
+  // 2. 기본 검은색(INK) 테두리
+  if(outline){
+    c.fillStyle = INK;
+    for(i=0;i<rows.length;i++) for(j=0;j<rows[i].length;j++)
+      if(rows[i][j] !== ".") c.fillRect(x+(j-1)*s, y+(i-1)*s, 3*s, 3*s);
+  }
+  
+  // 3. 실제 내부 픽셀 색상
+  for(i=0;i<rows.length;i++) for(j=0;j<rows[i].length;j++){
+    ch = rows[i][j]; if(ch === ".") continue;
+    c.fillStyle = spr.pal[ch]; c.fillRect(x+j*s, y+i*s, s, s);
+  }
+}
+
+/* 지형 그리기: r(x,y,w,h,색) — 한 칸은 24×24 '큰 픽셀', 위 8줄은 이름 띠 */
+var TERRAIN = {
+  "해안":function(r){
+    r(0,8,24,6,GOLD); r(0,14,24,10,SEA);
+    r(0,14,6,1,W); r(10,14,6,1,W); r(19,14,5,1,W);
+    r(3,18,4,1,SKY); r(14,20,5,1,SKY); r(7,22,4,1,SKY);
+  },
+  "산간":function(r){
+    var k; r(0,8,24,16,SKY);
+    for(k=0;k<12;k++) r(17-k,12+k,2*k+1,1,TEAL);
+    for(k=0;k<14;k++) r(8-k,10+k,2*k+1,1,k<3?W:GREEN);
+  },
+  "평야":function(r){
+    r(0,8,24,16,LIME);
+    [[3,11],[10,13],[18,10],[6,18],[14,20],[20,16],[2,22],[11,23]].forEach(function(p){
+      r(p[0],p[1],2,1,GREEN); r(p[0]+1,p[1]-1,1,1,GREEN);
+    });
+  },
+  "사막":function(r){
+    r(0,8,24,16,GOLD); r(0,20,24,4,AMBER); r(3,19,11,1,AMBER); r(5,18,6,1,AMBER);
+    r(18,11,2,9,GREEN); r(15,14,3,2,GREEN); r(15,12,2,2,GREEN); r(20,15,3,2,GREEN); r(21,13,2,2,GREEN);
+  },
+  "강":function(r){
+    var row, x; r(0,8,24,16,LIME);
+    for(row=8;row<24;row++){
+      x = 5 + Math.round((row-8)*0.6);
+      r(x,row,7,1,BLUE); if(row%4===1) r(x+2,row,2,1,SKY);
+    }
+  },
+  "농촌":function(r){
+    var row, x, n=0;
+    for(row=8;row<24;row+=2,n++){
+      r(0,row,24,2,n%2?AMBER:GOLD);
+      if(n%2===0) for(x=2;x<24;x+=5) r(x,row,1,1,GREEN);
+    }
+  }
+};
+
+/* =====================================================================
+   3. 보드
+   ===================================================================== */
+var BOARD_SIZE = 9, CELL = 96, U = 4;
+function buildOrder(){
+  var o=[], c, r, B=BOARD_SIZE;
+  for(c=B-1;c>=0;c--) o.push({row:B-1,col:c});
+  for(r=B-2;r>=0;r--) o.push({row:r,col:0});
+  for(c=1;c<=B-1;c++) o.push({row:0,col:c});
+  for(r=1;r<=B-2;r++) o.push({row:r,col:B-1});
+  return o;
+}
+var ORDER = buildOrder(), N = ORDER.length, SIDE = BOARD_SIZE-1;
+
+function buildTiles(){
+  return ORDER.map(function(pos,i){
+    var t = {idx:i,row:pos.row,col:pos.col,type:"region",label:"",region:null,owner:null,built:null,level:0,spent:0};
+    if(i===0){ t.type="start"; t.label="출발"; }
+    else if(i===SIDE){ t.type="island"; t.label="무인도"; }
+    else if(i===SIDE*2){ t.type="space"; t.label="우주여행"; }
+    else if(i===SIDE*3){ t.type="welfare"; t.label="사회복지"; }
+    else if(i%SIDE===3){ t.type="chance"; t.label="황금열쇠"; }
+    else { t.region = REGIONS[i%REGIONS.length]; t.label = t.region; }
+    return t;
+  });
+}
+
+var SRC = {}; SOURCES.forEach(function(s){ SRC[s.id]=s; });
+function fitMul(s,region){ return s.good.indexOf(region)!==-1 ? 1 : CFG.UNFIT; }
+function output(s,region){ return Math.round(s.power*fitMul(s,region)); }
+function tollFor(s,region,level){ return Math.round(s.power*fitMul(s,region)*CFG.TOLL_RATE*level); }
+function tollOf(t){ return tollFor(SRC[t.built],t.region,t.level); }
+function upCost(t){ return Math.round(SRC[t.built].cost*CFG.UPGRADE_RATE); }
+
+var $ = function(id){ return document.getElementById(id); };
+var canvas = $("board"), ctx = canvas.getContext("2d");
+var F11 = '24px "Galmuri11", monospace', F9 = '20px "Galmuri9", monospace';
+
+/* 캔버스 컨텍스트 안티앨리어싱 제거 적용 */
+ctx.imageSmoothingEnabled = false;
+ctx.mozImageSmoothingEnabled = false;
+ctx.webkitImageSmoothingEnabled = false;
+ctx.msImageSmoothingEnabled = false;
+
+function text(str, cx, cy, color, font){
+  ctx.font = font; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = color; ctx.fillText(str, cx, cy);
+}
+function outlined(str, cx, cy, color, font, o){
+  ctx.font = font; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = INK;
+  for(var dx=-o;dx<=o;dx+=o) for(var dy=-o;dy<=o;dy+=o) if(dx||dy) ctx.fillText(str, cx+dx, cy+dy);
+  ctx.fillText(str, cx+o, cy+2*o);
+  ctx.fillStyle = color; ctx.fillText(str, cx, cy);
+}
+
+function drawCenter(){
+  var f = function(x,y,w,h,c){ ctx.fillStyle=c; ctx.fillRect(x,y,w,h); };
+  f(96,96,672,672,SKY);
+  f(612,144,48,72,GOLD); f(600,156,72,48,GOLD);                        // 해
+  f(150,170,120,24,W); f(174,146,72,24,W); f(396,140,96,20,W); f(416,124,56,16,W); // 구름
+  f(96,584,672,184,SEA);                                              // 바다
+  [[130,620,56],[560,640,72],[250,690,48],[640,712,56],[150,736,64],[420,660,40]].forEach(function(w){ f(w[0],w[1],w[2],8,SKY); });
+  f(180,592,504,16,GOLD);                                             // 섬
+  f(204,552,456,40,GREEN); f(228,528,408,24,GREEN); f(264,504,336,24,GREEN); f(300,480,264,24,GREEN);
+  f(300,480,264,8,LIME);
+  drawSprite(ctx,"wind",306,336,12,true);
+  drawSprite(ctx,"wind",470,384,8,true);
+  drawSprite(ctx,"solar",232,456,6,true);
+  outlined("모두의 기술", 432, 248, GOLD, '60px "Galmuri14", monospace', 4);
+  outlined("친환경 에너지 대전", 432, 298, W, F11, 2);
+  text("by 기술이술술", 432, 730, W, F11);
+}
+
+function drawTile(t){
+  var X=t.col*CELL, Y=t.row*CELL;
+  var r = function(ux,uy,uw,uh,c){ ctx.fillStyle=c; ctx.fillRect(X+ux*U,Y+uy*U,uw*U,uh*U); };
+  ctx.save(); ctx.beginPath(); ctx.rect(X,Y,CELL,CELL); ctx.clip();
+  if(t.type==="region"){
+    TERRAIN[t.region](r);
+    r(0,0,24,8,REGION_COLOR[t.region]); ctx.fillStyle=INK; ctx.fillRect(X,Y+30,CELL,4);
+    if(t.owner){
+      ctx.strokeStyle = gs.P[t.owner].color; ctx.lineWidth = 8;
+      ctx.strokeRect(X+6,Y+6,CELL-12,CELL-12);
+    }
+    text(t.label, X+48, Y+16, REGION_TEXT[t.region]||INK, F11);
+    if(t.built){
+      drawSprite(ctx, t.built, X+24, Y+38, 4, true);
+      for(var i=0;i<t.level;i++){
+        ctx.fillStyle=INK; ctx.fillRect(X+12+i*14, Y+36, 14, 14);
+        ctx.fillStyle=GOLD; ctx.fillRect(X+15+i*14, Y+39, 8, 8);
+      }
+    }
+  } else if(t.type==="chance"){
+    r(0,8,24,16,W); r(0,0,24,8,GOLD); ctx.fillStyle=INK; ctx.fillRect(X,Y+30,CELL,4);
+    text(t.label, X+48, Y+16, INK, F9);
+    drawSprite(ctx,"key",X+24,Y+38,6,true);
+  } else if(t.type==="start"){
+    r(0,0,24,24,RED); drawSprite(ctx,"flag",X+20,Y+10,7,true); text(t.label,X+48,Y+80,W,F11);
+  } else if(t.type==="island"){
+    r(0,0,24,24,SEA); r(2,5,5,1,SKY); r(17,9,5,1,SKY); r(3,14,4,1,SKY);
+    drawSprite(ctx,"palm",X+20,Y+10,7,true); text(t.label,X+48,Y+80,W,F11);
+  } else if(t.type==="space"){
+    r(0,0,24,24,INK); r(3,3,1,1,W); r(19,5,1,1,W); r(5,12,1,1,GOLD); r(21,14,1,1,W); r(2,17,1,1,W);
+    drawSprite(ctx,"rocket",X+20,Y+8,7,false); text(t.label,X+48,Y+80,GOLD,F9);
+  } else if(t.type==="welfare"){
+    r(0,0,24,24,GREEN); drawSprite(ctx,"heart",X+20,Y+12,7,true); text(t.label,X+48,Y+80,W,F9);
+  }
+  ctx.restore();
+  ctx.strokeStyle=INK; ctx.lineWidth=4; ctx.strokeRect(X,Y,CELL,CELL);
+}
+
+function drawToken(who){
+  var p=gs.P[who];
+  if(!p || p.bankrupt) return; 
+  var t=gs.tiles[p.pos], X=t.col*CELL, Y=t.row*CELL;
+  
+  var onTile = ["player", "ai1", "ai2"].filter(function(k){ return gs.P[k] && !gs.P[k].bankrupt && gs.P[k].pos === p.pos; });
+  var idx = onTile.indexOf(who);
+  var offsetX = 28, offsetY = 50; 
+  
+  if(onTile.length === 2) {
+    offsetX = (idx === 0) ? 10 : 46;
+  } else if(onTile.length === 3) {
+    offsetX = (idx === 0) ? 28 : (idx === 1 ? 10 : 46);
+    offsetY = (idx === 0) ? 35 : 60;
+  }
+  
+  var spriteName = who === "player" ? "player" : (who === "ai2" ? "ai2" : "ai");
+  drawSprite(ctx, spriteName, X + offsetX, Y + offsetY, 5, true, W);
+}
+
+function draw(){
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle=INK; ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawCenter();
+  gs.tiles.forEach(drawTile);
+  var order = ["player", "ai1", "ai2"];
+  order.sort(function(a, b) { return (a === gs.turn) ? 1 : (b === gs.turn ? -1 : 0); });
+  order.forEach(function(k) { drawToken(k); });
+}
+
+/* =====================================================================
+   4. 화면 요소
+   ===================================================================== */
+var gs = null;
+function getActivePlayers() {
+  return ["player", "ai1", "ai2"].filter(function(k){ return !gs.P[k].bankrupt; });
+}
+function getNextPlayer(who) {
+  var active = getActivePlayers();
+  var idx = active.indexOf(who);
+  return active[(idx + 1) % active.length];
+}
+
+function rand(n){ return Math.floor(Math.random()*n); }
+function later(fn, ms){ var g=gs; setTimeout(function(){ if(gs===g && !g.over) fn(); }, ms); }
+
+function log(msg){
+  gs.logs.unshift(msg); gs.logs.length = Math.min(gs.logs.length, 4);
+  $("log").innerHTML = gs.logs.map(function(m){ return "<li>"+m+"</li>"; }).join("");
+}
+
+function refresh(){
+  draw();
+  ["player","ai1","ai2"].forEach(function(k){
+    var p=gs.P[k];
+    if(p.bankrupt) {
+      $("bud-"+k).textContent = "파산";
+      $("st-"+k).textContent = "탈락";
+      $("pc-"+k).classList.remove("on");
+      $("pc-"+k).style.opacity = "0.5";
+    } else {
+      var n=gs.tiles.filter(function(t){ return t.owner===k; }).length;
+      $("bud-"+k).textContent = p.budget;
+      $("st-"+k).textContent = "발전소 "+n+(p.skip?" · 쉬는 중":"");
+      $("pc-"+k).classList.toggle("on", gs.turn===k && !gs.over);
+      $("pc-"+k).style.opacity = "1";
+    }
+  });
+  $("roundInfo").textContent = "ROUND "+gs.round+"/"+CFG.MAX_ROUNDS;
+}
+
+/* 패널 카드 */
+function card(o){
+  var p=$("panel"), el, focusEl=null; p.innerHTML="";
+  if(o.tag){ el=document.createElement("span"); el.className="tag"; el.textContent=o.tag; if(o.tagColor) el.style.background=o.tagColor; p.appendChild(el); }
+  if(o.title){ el=document.createElement("h3"); el.innerHTML=o.title; p.appendChild(el); }
+  var body = (gs.note ? '<p class="note">'+gs.note+'</p>' : "") + (o.html||""); gs.note="";
+  if(body){ el=document.createElement("div"); el.className="body"; el.innerHTML=body; p.appendChild(el); }
+  var bw=document.createElement("div"); bw.className="btns";
+  (o.buttons||[]).forEach(function(b){
+    var btn=document.createElement("button"); btn.type="button";
+    btn.className="btn"+(b.primary?" primary":""); btn.innerHTML=b.label; btn.disabled=!!b.disabled;
+    if(b.quiz) btn.setAttribute("data-q","1");
+    btn.onclick=function(){ sfx("click"); b.fn(); };
+    bw.appendChild(btn); if(b.primary && !focusEl) focusEl=btn;
+  });
+  p.appendChild(bw);
+  if(focusEl && userActed) focusEl.focus({preventScroll:true});
+}
+function ok(fn, label){ return [{label:label||"▶ 확인", primary:true, fn:fn}]; }
+
+var FACE = {1:[4],2:[2,6],3:[2,4,6],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+function showDice(d, msg){
+  var h='<div class="die'+(d===1?" one":"")+'">';
+  for(var i=0;i<9;i++) h+='<i'+(FACE[d].indexOf(i)!==-1?' class="d"':"")+'></i>';
+  $("dice").innerHTML = h+'</div><span>'+msg+'</span>';
+}
+
+/* 효과음 (기본 꺼짐) */
+var snd=false, ac=null, userActed=false;
+var SFX={click:[[440,.04]],tick:[[660,.02]],step:[[330,.04]],coin:[[880,.06],[1320,.1]],
+  ok:[[660,.08],[880,.08],[1320,.14]],no:[[220,.12],[165,.2]],pay:[[392,.08],[294,.14]],
+  build:[[523,.06],[659,.06],[784,.1]],win:[[523,.1],[659,.1],[784,.1],[1047,.25]]};
+function sfx(k){
+  if(!snd) return;
+  try{
+    ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+    var t=ac.currentTime;
+    SFX[k].forEach(function(n){
+      var o=ac.createOscillator(), g=ac.createGain();
+      o.type="square"; o.frequency.value=n[0]; g.gain.value=0.04;
+      o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+n[1]); t+=n[1];
+    });
+  }catch(e){}
+}
+
+/* =====================================================================
+   5. 게임 진행 및 매각 시스템
+   ===================================================================== */
+function newGame(){
+  gs = { tiles:buildTiles(), round:1, turn:"player", over:false, usedQuiz:[], logs:[], note:"",
+    P:{ player:{key:"player",name:"당신",color:BLUE,pos:0,budget:CFG.START_BUDGET,skip:false,pending:null,right:0,asked:0,bankrupt:false},
+        ai1:{key:"ai1",name:"COM1",color:RED,pos:0,budget:CFG.START_BUDGET,skip:false,pending:null,right:0,asked:0,bankrupt:false},
+        ai2:{key:"ai2",name:"COM2",color:GOLD,pos:0,budget:CFG.START_BUDGET,skip:false,pending:null,right:0,asked:0,bankrupt:false} } };
+  showDice(1,"주사위 준비 완료");
+  log("3인 게임을 시작합니다. 예산 "+CFG.START_BUDGET+"억");
+  refresh();
+  card({tag:"START", tagColor:INK, title:"친환경 에너지 대전에 오신 것을 환영합니다!",
+    html:"<p>주사위를 굴려 도착한 땅에서 퀴즈를 맞히면 <b>친환경 발전소</b>를 지을 수 있습니다.</p>"+
+         "<p>땅에 맞는 발전소를 지을수록 사용료가 커집니다. 상대를 파산시키거나 "+CFG.MAX_ROUNDS+"라운드 뒤 총자산이 많으면 승리!</p>",
+    buttons:ok(function(){ startTurn("player"); }, "▶ 게임 시작 (당신 먼저)")});
+}
+
+function startTurn(who){
+  if(gs.over) return;
+  gs.turn=who; var p=gs.P[who];
+  if(p.skip){ p.skip=false; refresh(); return retryQuiz(who); }
+  refresh();
+  if(who==="player"){
+    card({tag:"당신의 턴", tagColor:p.color, title:"주사위를 굴려 이동하세요.",
+      html:"<p>예산 "+p.budget+"억 · "+gs.round+"/"+CFG.MAX_ROUNDS+" 라운드</p>",
+      buttons:ok(function(){ roll(who); }, "▶ 주사위 굴리기")});
+  } else {
+    card({tag:p.name+"의 턴", tagColor:p.color, title:p.name+"이(가) 주사위를 굴립니다…"});
+    later(function(){ roll(who); }, 700);
+  }
+}
+
+function endTurn(who){
+  if(gs.over) return;
+  var p = gs.P[who];
+  var owned = gs.tiles.filter(function(t){ return t.owner === who; });
+  
+  if(p.budget <= CFG.SELL_THRESHOLD && owned.length > 0) {
+    if(who === "player") {
+      return showSellMenu(who, function(){ checkBankruptAndPass(who); });
+    } else {
+      return aiSellLogic(who, function(){ checkBankruptAndPass(who); });
+    }
+  }
+  checkBankruptAndPass(who);
+}
+
+function checkBankruptAndPass(who) {
+  var p = gs.P[who];
+  if(p.budget < 0) {
+    var ended = processBankrupt(who);
+    if(ended) return; 
+  }
+  var nextWho = getNextPlayer(who);
+  var active = getActivePlayers();
+  if(nextWho === active[0]) {
+    if(gs.round >= CFG.MAX_ROUNDS) return finish(null, null);
+    gs.round++;
+  }
+  startTurn(nextWho);
+}
+
+function showSellMenu(who, onDone) {
+  var p = gs.P[who];
+  var owned = gs.tiles.filter(function(t){ return t.owner === who; });
+  
+  if(owned.length === 0 || (p.budget >= 0 && p.budget > CFG.SELL_THRESHOLD)) {
+    return onDone();
+  }
+  
+  var buttons = owned.map(function(t) {
+    var s = SRC[t.built];
+    var sellPrice = Math.round(t.spent * CFG.SELL_RATE);
+    return {
+      label: t.region + " " + s.name + " (Lv." + t.level + ") 매각 <small>회수금 +" + sellPrice + "억 확보</small>",
+      fn: function() {
+        sellTile(who, t, sellPrice);
+        showSellMenu(who, onDone);
+      }
+    };
+  });
+  
+  if(p.budget >= 0) {
+    buttons.push({ label: "매각하지 않고 턴 종료", primary: true, fn: function(){ onDone(); } });
+  } else {
+    buttons.push({ label: "더 이상 매각하지 않음 (파산 탈락)", fn: function(){ onDone(); } });
+  }
+  
+  card({
+    tag: p.name + " 자산 매각", 
+    tagColor: p.budget < 0 ? RED : p.color, 
+    title: p.budget < 0 ? "경고! 예산이 마이너스입니다." : "예산이 " + CFG.SELL_THRESHOLD + "억 이하입니다.",
+    html: "<p>현재 예산: <b class='" + (p.budget<0?"bad":"") + "'>" + p.budget + "억</b><br>발전소를 매각하여 자금을 확보하시겠습니까?<br>(투자금의 " + (CFG.SELL_RATE*100) + "% 회수)</p>",
+    buttons: buttons
+  });
+}
+
+function aiSellLogic(who, onDone) {
+  var p = gs.P[who];
+  var owned = gs.tiles.filter(function(t){ return t.owner === who; });
+  
+  if(p.budget >= 50 || owned.length === 0) {
+    return onDone();
+  }
+  
+  owned.sort(function(a,b){ return a.spent - b.spent; });
+  var t = owned[0];
+  var sellPrice = Math.round(t.spent * CFG.SELL_RATE);
+  
+  card({tag: p.name + " 자산 매각", tagColor: p.color, title: p.name + "이(가) 부족한 자금을 위해 발전소를 매각합니다."});
+  
+  later(function(){
+    sellTile(who, t, sellPrice);
+    aiSellLogic(who, onDone);
+  }, 1000);
+}
+
+function sellTile(who, t, price) {
+  var p = gs.P[who];
+  p.budget += price;
+  log(p.name + ": " + t.region + " 발전소 매각 (+" + price + "억)");
+  sfx("coin");
+  t.owner = null; t.built = null; t.level = 0; t.spent = 0;
+  refresh();
+}
+
+function roll(who){
+  var p=gs.P[who], n=0, g=gs;
+  card({tag:p.name+"의 턴", tagColor:p.color, title:"주사위 굴리는 중…"});
+  var iv=setInterval(function(){
+    if(gs!==g){ clearInterval(iv); return; }
+    n++; var d=1+rand(6);
+    if(n<10){ showDice(d,"굴리는 중…"); sfx("tick"); return; }
+    clearInterval(iv); showDice(d, p.name+" "+d+"칸 이동!");
+    later(function(){ move(who,d); }, 450);
+  }, 80);
+}
+
+function move(who, steps){
+  var p=gs.P[who], left=steps;
+  (function step(){
+    p.pos=(p.pos+1)%N; left--;
+    if(p.pos===0){
+      p.budget+=CFG.GO_BONUS; sfx("coin");
+      log(p.name+" 출발점 통과! 지원금 +"+CFG.GO_BONUS+"억");
+      gs.note = "출발점을 지나 지원금 +"+CFG.GO_BONUS+"억을 받았습니다.";
+    } else sfx("step");
+    refresh();
+    if(left>0) later(step,200); else later(function(){ arrive(who); },250);
+  })();
+}
+
+function arrive(who){
+  var p=gs.P[who], t=gs.tiles[p.pos], next=function(){ endTurn(who); };
+  function simple(o){
+    if(who!=="player" && !o.wait){ o.buttons=[]; card(o); later(next,1300); }
+    else { o.buttons=ok(next); card(o); }
+  }
+  if(t.type==="start") return simple({tag:"출발", tagColor:RED, title:p.name+" 출발점 도착!"});
+  if(t.type==="island") return simple({tag:"무인도", tagColor:SEA, title:p.name+", 무인도에서 잠시 쉬어갑니다.", html:"<p>아무 일도 일어나지 않습니다.</p>"});
+  if(t.type==="space"){
+    p.pos=0; p.budget+=CFG.GO_BONUS; sfx("coin"); refresh();
+    log(p.name+" 우주여행 → 출발점 (+"+CFG.GO_BONUS+"억)");
+    return simple({wait:true, tag:"우주여행", tagColor:INK, title:p.name+", 우주선을 타고 출발점으로 순간이동!", html:"<p>지원금 +"+CFG.GO_BONUS+"억을 받았습니다.</p>"});
+  }
+  if(t.type==="welfare"){
+    p.budget+=CFG.WELFARE; sfx("coin"); refresh();
+    log(p.name+" 사회복지 지원금 +"+CFG.WELFARE+"억");
+    return simple({wait:true, tag:"사회복지", tagColor:GREEN, title:p.name+", 에너지 복지 지원금을 받았습니다.", html:"<p>예산 +"+CFG.WELFARE+"억</p>"});
+  }
+  if(t.type==="chance") return chance(who);
+  if(!t.owner) return quiz(who, t, "build");
+  if(t.owner===who) return ownTile(who, t);
+  toll(who, t);
+}
+
+function chance(who){
+  var p=gs.P[who], e=CHANCE_EVENTS[rand(CHANCE_EVENTS.length)], plus=e.type==="bonus";
+  p.budget += plus ? e.amount : -e.amount;
+  sfx(plus?"coin":"pay"); refresh();
+  log(p.name+" 황금열쇠: "+(plus?"+":"-")+e.amount+"억");
+  card({tag:"황금열쇠", tagColor:AMBER, title:p.name+"의 황금열쇠!",
+    html:'<p class="'+(plus?"good":"bad")+'">'+e.text.replace(/\n/g,"<br>")+"</p>",
+    buttons:ok(function(){ endTurn(who); })});
+}
+
+function pickQuiz(){
+  if(gs.usedQuiz.length>=QUIZZES.length) gs.usedQuiz=[];
+  var i; do{ i=rand(QUIZZES.length); }while(gs.usedQuiz.indexOf(i)!==-1);
+  gs.usedQuiz.push(i);
+  var q=QUIZZES[i], order=q.choices.map(function(_,k){ return k; }), a, b, tmp;
+  for(a=order.length-1;a>0;a--){ b=rand(a+1); tmp=order[a]; order[a]=order[b]; order[b]=tmp; }
+  return {q:q.q, exp:q.exp, choices:order.map(function(k){ return q.choices[k]; }), answer:order.indexOf(q.answer)};
+}
+
+function quiz(who, t, mode){
+  var p=gs.P[who], qz=pickQuiz(), tag=t.region+" · "+(mode==="build"?"건설 허가 퀴즈":"증설 퀴즈");
+  p.asked++;
+  if(who!=="player"){
+    var correct=Math.random()<CFG.AI_CORRECT, pick=qz.answer;
+    if(correct) p.right++; else { do{ pick=rand(qz.choices.length); }while(pick===qz.answer); }
+    sfx(correct?"ok":"no");
+    return card({tag:p.name+" · "+tag, tagColor:p.color, title:qz.q,
+      html:'<ul class="aiq">'+qz.choices.map(function(c,i){
+              return '<li class="'+(i===qz.answer?"ans":(i===pick?"miss":""))+'">'+(i+1)+". "+c+(i===pick?" ◀ "+p.name:"")+"</li>";
+            }).join("")+"</ul>"+
+           '<p class="'+(correct?"good":"bad")+'">'+(correct?p.name+" 정답!":(mode==="build"?p.name+" 오답! 다음 턴은 쉬고 재도전합니다.":p.name+" 오답! 증설에 실패했습니다."))+"</p>"+
+           '<p class="exp">'+qz.exp+"</p>",
+      buttons:ok(function(){ afterQuiz(who,t,mode,correct); })});
+  }
+  var done=false;
+  card({tag:tag, tagColor:p.color, title:qz.q,
+    buttons:qz.choices.map(function(c,i){ return {label:(i+1)+". "+c, quiz:true, fn:function(){ answer(i); }}; })});
+  var panel=$("panel"), btns=Array.prototype.slice.call(panel.querySelectorAll(".btn"));
+  function answer(i){
+    if(done) return; done=true;
+    var correct = i===qz.answer; if(correct) p.right++;
+    btns.forEach(function(b,k){
+      b.classList.add("done"); b.tabIndex=-1;
+      if(k===qz.answer) b.classList.add("correct");
+      if(k===i && !correct) b.classList.add("wrong");
+    });
+    sfx(correct?"ok":"no");
+    var res=document.createElement("div"); res.className="body";
+    res.innerHTML='<p class="'+(correct?"good":"bad")+'">'+
+      (correct?"정답!":(mode==="build"?"오답! 다음 턴은 쉬고 새 문제로 재도전합니다.":"오답! 이번에는 증설할 수 없습니다."))+
+      '</p><p class="exp">'+qz.exp+"</p>";
+    var nb=document.createElement("button"); nb.type="button"; nb.className="btn primary";
+    nb.textContent = correct ? (mode==="build"?"▶ 발전소 고르기":"▶ 증설하기") : "▶ 턴 종료";
+    nb.onclick=function(){ sfx("click"); afterQuiz(who,t,mode,correct); };
+    panel.appendChild(res); panel.appendChild(nb); nb.focus({preventScroll:true});
+  }
+}
+
+function afterQuiz(who, t, mode, correct){
+  var p=gs.P[who];
+  if(!correct){
+    if(mode==="build"){ p.skip=true; p.pending=t.idx; log(p.name+" 퀴즈 오답 → 1턴 쉼"); }
+    return endTurn(who);
+  }
+  if(mode==="upgrade") return upgrade(who,t);
+  if(who!=="player") aiBuild(who,t); else buildMenu(t);
+}
+
+function retryQuiz(who){
+  var p=gs.P[who], t=gs.tiles[p.pending]; p.pending=null;
+  if(t.owner){
+    return card({tag:"재도전 불가", tagColor:SLATE,
+      title:"쉬는 사이 "+t.region+" 부지에 "+gs.P[t.owner].name+"의 발전소가 들어섰습니다.",
+      buttons:ok(function(){ endTurn(who); })});
+  }
+  log(p.name+" 퀴즈 재도전");
+  quiz(who, t, "build");
+}
+
+function buildMenu(t){
+  var p=gs.P.player;
+  var buttons=SOURCES.map(function(s){
+    var fit=s.good.indexOf(t.region)!==-1;
+    return {disabled:p.budget<s.cost,
+      label:s.name+' 발전소 <span class="chip '+(fit?"fit":"unfit")+'">'+(fit?"입지 적합":"입지 불리")+"</span>"+
+            "<small>건설 "+s.cost+"억 · 발전량 "+output(s,t.region)+" · 받을 사용료 "+tollFor(s,t.region,1)+"억</small>",
+      fn:function(){ build("player",t,s); }};
+  });
+  buttons.push({label:"건설하지 않고 넘어가기", fn:function(){ endTurn("player"); }});
+  card({tag:t.region+" · 발전소 건설", tagColor:p.color, title:"어떤 발전소를 지을까요? (예산 "+p.budget+"억)", buttons:buttons});
+}
+
+function build(who, t, s){
+  var p=gs.P[who];
+  p.budget-=s.cost; t.owner=who; t.built=s.id; t.level=1; t.spent=s.cost;
+  sfx("build"); log(p.name+": "+t.region+"에 "+s.name+" 발전소 건설 (-"+s.cost+"억)");
+  if(who!=="player") gs.note=p.name+"이(가) "+t.region+"에 "+s.name+" 발전소를 지었습니다. 사용료 "+tollOf(t)+"억";
+  refresh(); endTurn(who);
+}
+
+function aiBuild(who, t){
+  var p=gs.P[who], best=null;
+  SOURCES.forEach(function(s){
+    if(p.budget-s.cost<CFG.AI_RESERVE) return;
+    var v=tollFor(s,t.region,1) + (s.good.indexOf(t.region)!==-1 ? 1000 : 0);
+    if(!best || v>best.v || (v===best.v && s.cost<best.s.cost)) best={s:s,v:v};
+  });
+  if(best) return build(who,t,best.s);
+  log(p.name+": 예산이 부족해 건설 포기"); gs.note=p.name+"은(는) 예산이 부족해 건설을 포기했습니다.";
+  endTurn(who);
+}
+
+function ownTile(who, t){
+  var p=gs.P[who], s=SRC[t.built], cost=upCost(t);
+  var can = t.level<CFG.MAX_LEVEL && p.budget>=cost;
+  if(who!=="player"){
+    if(can && p.budget-cost>=CFG.AI_RESERVE+150) return quiz(who,t,"upgrade");
+    card({tag:p.name+" 발전소", tagColor:p.color, title:p.name+"이(가) 자기 "+t.region+" 발전소에 들렀습니다."});
+    return later(function(){ endTurn(who); },1300);
+  }
+  var head=t.region+" · "+s.name+" 발전소 Lv."+t.level;
+  if(!can) return card({tag:"내 발전소", tagColor:p.color, title:head,
+    html:"<p>"+(t.level>=CFG.MAX_LEVEL?"이미 최고 단계입니다.":"증설 비용 "+cost+"억이 부족합니다.")+"</p>",
+    buttons:ok(function(){ endTurn(who); })});
+  card({tag:"내 발전소", tagColor:p.color, title:head,
+    html:"<p>퀴즈를 맞히면 <b>"+cost+"억</b>으로 Lv."+(t.level+1)+"까지 증설합니다.</p>"+
+         "<p>사용료 "+tollOf(t)+"억 → "+tollFor(s,t.region,t.level+1)+"억</p>",
+    buttons:[{label:"▶ 증설 퀴즈 도전", primary:true, fn:function(){ quiz(who,t,"upgrade"); }},
+             {label:"넘어가기", fn:function(){ endTurn(who); }}]});
+}
+
+function upgrade(who, t){
+  var p=gs.P[who], cost=upCost(t);
+  p.budget-=cost; t.level++; t.spent+=cost; sfx("build");
+  log(p.name+": "+t.region+" 발전소 Lv."+t.level+" 증설 (-"+cost+"억)");
+  if(who!=="player") gs.note=p.name+"이(가) "+t.region+" 발전소를 Lv."+t.level+"로 증설했습니다. 사용료 "+tollOf(t)+"억";
+  refresh(); endTurn(who);
+}
+
+function toll(who, t){
+  var p=gs.P[who], o=gs.P[t.owner], s=SRC[t.built], amt=tollOf(t);
+  p.budget-=amt; o.budget+=amt; sfx("pay"); refresh();
+  log(p.name+" → "+o.name+" 사용료 "+amt+"억");
+  card({tag:"전력 사용료", tagColor:RED, title:p.name+" → "+o.name+" 사용료 "+amt+"억 지불",
+    html:"<p>"+o.name+"의 "+t.region+" "+s.name+" 발전소(Lv."+t.level+")에 도착했습니다.</p>"+
+         '<p class="exp">발전량 '+output(s,t.region)+" × "+CFG.TOLL_RATE+" × Lv."+t.level+" = "+amt+"억</p>",
+    buttons:ok(function(){ endTurn(who); })});
+}
+
+function finish(winner, bankrupt){
+  gs.over=true;
+  var val=function(k){ return gs.tiles.reduce(function(a,t){ return a+(t.owner===k?t.spent:0); },0); };
+  var cash=function(k){ return gs.P[k].bankrupt ? 0 : Math.max(0,gs.P[k].budget); };
+  var total=function(k){ return gs.P[k].bankrupt ? 0 : cash(k)+val(k); };
+  
+  var A=total("player"), B=total("ai1"), C=total("ai2");
+  
+  if(!winner) {
+    var maxScore = Math.max(A, B, C);
+    var tops = [];
+    if(A === maxScore) tops.push("player");
+    if(B === maxScore) tops.push("ai1");
+    if(C === maxScore) tops.push("ai2");
+    if(tops.length === 1) winner = tops[0];
+    else winner = "draw"; // 동점
+  }
+
+  var pl=gs.P.player, rate=pl.asked ? Math.round(pl.right/pl.asked*100) : 0;
+  var head = winner==="player" ? "YOU WIN!" : (winner==="draw" ? "DRAW" : gs.P[winner].name+" 승리!");
+  var headColor = winner==="player" ? BLUE : (winner==="ai1" ? RED : (winner==="ai2" ? GOLD : INK));
+  var why = bankrupt ? gs.P[bankrupt].name+" 파산에 의한 게임 종료!" : CFG.MAX_ROUNDS+"라운드 종료 · 총자산 비교";
+  sfx(winner==="player"?"win":"no"); refresh();
+  log(winner==="draw" ? "무승부" : gs.P[winner].name+" 승리!");
+  
+  card({tag:"게임 종료", tagColor:INK,
+    title:'<div class="big" style="color:'+headColor+'">'+head+"</div>",
+    html:"<p>"+why+"</p>"+
+      '<table class="tbl"><thead><tr><th></th><th>당신</th><th>COM 1</th><th>COM 2</th></tr></thead><tbody>'+
+      "<tr><td>예산</td><td>"+cash("player")+"억</td><td>"+cash("ai1")+"억</td><td>"+cash("ai2")+"억</td></tr>"+
+      "<tr><td>발전소 가치</td><td>"+val("player")+"억</td><td>"+val("ai1")+"억</td><td>"+val("ai2")+"억</td></tr>"+
+      '<tr class="sum"><td>총자산</td><td>'+A+"억</td><td>"+B+"억</td><td>"+C+"억</td></tr></tbody></table>"+
+      "<p>내 퀴즈 정답률 "+pl.right+"/"+pl.asked+" ("+rate+"%)</p>",
+    buttons:ok(newGame, "▶ 다시 도전하기")});
+}
+
+/* =====================================================================
+   6. 안내 영역 · 입력 · 시작
+   ===================================================================== */
+function renderGuide(){
+  var g=$("guide"); g.innerHTML="";
+  SOURCES.forEach(function(s){
+    var d=document.createElement("div"); d.className="gc";
+    d.innerHTML='<canvas width="56" height="56"></canvas><div><strong>'+s.name+"</strong>건설 "+s.cost+"억 · 발전량 "+s.power+"<br>"+
+      s.good.map(function(r){ return '<span class="chip" style="background:'+REGION_COLOR[r]+";color:"+(REGION_TEXT[r]||INK)+'">'+r+"</span>"; }).join(" ")+"</div>";
+    g.appendChild(d);
+    drawSprite(d.querySelector("canvas").getContext("2d"), s.id, 4, 4, 4, true);
+  });
+  $("rules").innerHTML=[
+    "시작 예산은 "+CFG.START_BUDGET+"억, 출발점을 지날 때마다 "+CFG.GO_BONUS+"억을 받습니다.",
+    "빈 땅에 도착하면 퀴즈를 풀고, 맞히면 발전소를 지을 수 있습니다.",
+    "틀리면 다음 턴은 쉬고, 그 자리에서 새 문제로 재도전합니다.",
+    "땅에 맞는 발전소는 발전량 100%, 맞지 않으면 "+(CFG.UNFIT*100)+"%만 냅니다.",
+    "상대 발전소에 도착하면 사용료(발전량 × "+CFG.TOLL_RATE+" × 레벨)를 냅니다.",
+    "내 발전소에 다시 도착하면 퀴즈를 풀고 Lv."+CFG.MAX_LEVEL+"까지 증설할 수 있습니다.",
+    "예산이 "+CFG.SELL_THRESHOLD+"억 이하로 떨어지면 턴 종료 전에 발전소를 매각(투자금의 "+(CFG.SELL_RATE*100)+"% 회수)하여 자금을 확보할 수 있습니다.",
+    "예산이 0 미만이 되면 즉시 파산 탈락. "+CFG.MAX_ROUNDS+"라운드가 끝나면 살아남은 사람 중 총자산이 많은 쪽이 이깁니다.",
+    "퀴즈 보기는 숫자 키 1~4로도 고를 수 있습니다.",
+    "전자칠판처럼 큰 화면에서는 전체가 자동으로 확대됩니다. 오른쪽 위 버튼으로 끌 수 있습니다."
+  ].map(function(x){ return "<li>"+x+"</li>"; }).join("");
+  
+  // 아바타에도 동일하게 흰색 스티커 효과 적용
+  drawSprite($("av-player").getContext("2d"),"player",4,4,4,true, W);
+  drawSprite($("av-ai1").getContext("2d"),"ai",4,4,4,true, W);
+  drawSprite($("av-ai2").getContext("2d"),"ai2",4,4,4,true, W);
+}
+
+document.addEventListener("pointerdown", function(){ userActed=true; }, {once:true});
+document.addEventListener("keydown", function(e){
+  userActed=true;
+  if(e.key>="1" && e.key<="9" && !e.ctrlKey && !e.metaKey && !e.altKey){
+    var b=$("panel").querySelectorAll(".btn[data-q]:not(.done)")[+e.key-1];
+    if(b) b.click();
+  }
+});
+$("sndBtn").onclick=function(){
+  snd=!snd; this.setAttribute("aria-pressed", String(snd));
+  this.textContent = snd ? "♪ 소리 켜짐" : "♪ 소리 꺼짐"; sfx("ok");
+};
+
+/* 큰 화면(전자칠판) 모드: 화면에 맞춰 0.25배 단위로 전체를 확대 */
+var bigMode=true;
+function fitScreen(){
+  var z=1;
+  if(bigMode && window.innerWidth>=1100){
+    z=Math.min((window.innerWidth-32)/960, (window.innerHeight-24)/660);
+    z=Math.max(1, Math.floor(z*4)/4);
+  }
+  $("wrap").style.zoom = z;
+}
+$("bigBtn").onclick=function(){
+  bigMode=!bigMode; this.setAttribute("aria-pressed", String(bigMode));
+  this.textContent = bigMode ? "▣ 큰 화면 자동" : "▣ 큰 화면 꺼짐"; fitScreen();
+};
+window.addEventListener("resize", fitScreen);
+fitScreen();
+
+renderGuide();
+newGame();
+if(document.fonts && document.fonts.load){
+  Promise.all([document.fonts.load(F11,"가"), document.fonts.load(F9,"가"), document.fonts.load('60px "Galmuri14"',"가")])
+    .then(function(){ if(gs) draw(); }, function(){});
+}
+})();
+</script>
+</body>
+</html>
